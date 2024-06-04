@@ -27,7 +27,42 @@ def update_combine_dict(combine_dict, packet_key_name, layer_name, attributes) -
         combine_dict[packet_key_name].update({layer_name: None})
 
 
-live_traffic = capture_live_traffic(interface_to_use='Ethernet 2', num_packets=2)
+def extract_substring(iterable: list | dict | tuple | set, identifier: str) -> str:
+    new_substring = str()
+    for char in iterable:
+        if char != identifier:
+            new_substring += char
+        else:
+            break
+    return new_substring
+
+
+def format_attribute_dict(attribute_dict: dict) -> dict:
+    for index in range(len(attribute_dict)):
+        packet_num = f'Packet {index + 1}'
+        for key, value in attribute_dict[packet_num].items():
+            if value != None:
+                for inner_key in list(attribute_dict[packet_num][key]):
+                    extracted_val = extract_substring(inner_key, '.')
+                    new_dict_name = inner_key.replace(extracted_val, f'{key}')
+                    combine_dict[packet_num][key][new_dict_name] = combine_dict[packet_num][key].pop(inner_key)
+    return attribute_dict
+
+
+def only_grab_specific_attributes(attribute_dict: dict, search_for_iterable: list|tuple|set) -> dict:
+    subset_dict = dict()
+    for index, (packet_data) in enumerate(attribute_dict.values(), start=1):
+        new_packet_num = f'Packet {index}'
+        subset_dict[new_packet_num] = {}
+        for layer_name, layer_value in packet_data.items():
+            if layer_value is not None:
+                filtered_values = {key: value for key, value in layer_value.items() if key in search_for_iterable}
+                if filtered_values:
+                    subset_dict[new_packet_num][layer_name] = filtered_values
+    return subset_dict
+
+
+live_traffic = capture_live_traffic(interface_to_use='Ethernet 2', num_packets=100)
 
 osi_layers = instantiate_osi_layers(physical_layer=PhysicalLayer(), datalink_layer=DataLinkLayer(), network_layer=NetworkLayer(), transport_layer=TransportLayer(), session_layer=SessionLayer(), presentation_layer=PresentationLayer(), application_layer=ApplicationLayer())
 
@@ -41,3 +76,9 @@ for i in range(len(live_traffic)):
     combine_dict[packet_key_name] = {}
     for name in layer_attributes:
         update_combine_dict(combine_dict, packet_key_name, name, layer_attributes[name])
+
+combine_dict = format_attribute_dict(combine_dict)
+list_of_attributes_to_add = ['datalink_layer.src', 'datalink_layer.dst', 'network_layer.src', 'network_layer.dst', 'transport_layer.srcport', 'transport_layer.dstport']
+combine_dict = only_grab_specific_attributes(combine_dict, list_of_attributes_to_add)
+# pprint(testing)
+# pprint(combine_dict)

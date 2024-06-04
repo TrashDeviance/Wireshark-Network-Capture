@@ -1,6 +1,8 @@
 import sqlite3
 from capture_traffic import combine_dict
+from capture_traffic import list_of_attributes_to_add
 from pprint import pprint
+
 
 def create_connection_to_db(schema: str) -> sqlite3.Connection:
     """
@@ -53,40 +55,26 @@ create_packet_info_table = create_table_for_db(connection, f"""CREATE TABLE IF N
 
 attributes_to_insert_into_table = format_attribute_columns_for_table(list(attributes.keys()))
 
+# Mapping attributes to index values to guarantee correct placing before sent to SQL DB
+mapping_attributes_order = dict()
+for index, element in enumerate(list_of_attributes_to_add):
+    mapping_attributes_order[element] = index
 
-retrieve_packet_keys = combine_dict.keys()
+# Finding attributes values and then store them into a list to be sent to DB
+for index, value in enumerate(combine_dict.values(), start=1):
+    values_to_add_list = list([None] * len(attributes))
+    for keys, values in value.items():
+        for inner_key, inner_value in values.items():
+            if inner_key in mapping_attributes_order:
+                values_to_add_list[mapping_attributes_order[inner_key]] = inner_value
 
-keys_to_search_for = tuple(("eth.src", "eth.dst", ".src_host", ".dst_host", ".srcport", ".dstport"))
+    print(values_to_add_list)
+    create_packet_info_table.execute(f"""INSERT INTO packet_info ({attributes_to_insert_into_table}) VALUES ({parameterized_query(attributes)})""", (values_to_add_list))
 
-# Iterate over each packet key, exp 'Packet 1'
-for packet in retrieve_packet_keys:
-    values_to_insert_into_table = []
-    
-    # retrieving the layer name with the values store in the layer dict
-    for key, value in combine_dict[packet].items():
-        # Checks to see if the layer contains any values in the dict
-        if combine_dict[packet][key] != None:
-            # retrieving the keys inside of the layer
-            for inner_key in combine_dict[packet][key].keys():
-                # filtering down the keys we want to store in packet_info table
-                if inner_key.endswith(keys_to_search_for):
-                    values_to_insert_into_table.append(combine_dict[packet][key][inner_key])
-                    
-    
-    # extends the list to match the length of the attributes the table will have
-    current_len = len(values_to_insert_into_table)
-    if current_len != len(attributes):
-        amount = len(attributes) - current_len
-        values_to_insert_into_table.extend([None] * amount)
-    
-    complete_values_to_add = tuple(values_to_insert_into_table)
-    # print(complete_values_to_add)
-    create_packet_info_table.execute(f"""INSERT INTO packet_info ({attributes_to_insert_into_table}) VALUES ({parameterized_query(attributes)})""", (complete_values_to_add))
+    connection.commit()
 
-# connection.commit()
+rows = create_packet_info_table.execute('SELECT * FROM packet_info').fetchall()
+for packet_info in rows:
+    print(packet_info)
 
-# rows = create_packet_info_table.execute('SELECT * FROM packet_info').fetchall()
-# for packet_info in rows:
-#     print(packet_info)
-
-# connection.close()
+connection.close()

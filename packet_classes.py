@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Callable
-from pprint import pprint
+from typing import Optional, Union
 import pyshark
-from dataclasses import dataclass
 
 
 def retrieve_packet(capture_interface: Union[pyshark.RemoteCapture, pyshark.FileCapture, pyshark.InMemCapture, pyshark.LiveCapture, pyshark.LiveRingCapture]) -> dict:
